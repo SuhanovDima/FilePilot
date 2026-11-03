@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
+  <title>FilePilot — локальный порядок</title>
+  <link rel="stylesheet" th:href="@{/app.css}">
+  <script defer th:src="@{/vendor/htmx-2.0.8.min.js}"></script>
+  <script defer th:src="@{/app.js}"></script>
+</head>
+<body>
+<header><a class="brand" href="/">▣ FilePilot <small>0.1.0</small></a><span>Локально. Под вашим контролем.</span></header>
+<main>
+  <section class="intro"><div><p class="eyebrow">ВАШИ ФАЙЛЫ · ВАШЕ РЕШЕНИЕ</p><h1>Порядок начинается<br>с плана.</h1><p>Посмотрите изменения, выберите нужные файлы и подтвердите перенос.</p></div>
+    <aside><div id="model-status" th:fragment="modelStatus"><span class="badge" th:text="'LLM ' + ${llmStatus}">LLM OFFLINE</span><p th:text="${modelName}">rules</p><small>Статус последнего AI-запроса. До первого успеха — OFFLINE.</small></div><button class="secondary" hx-get="/ui/health" hx-target="#model-status" hx-swap="outerHTML">Обновить статус</button></aside>
+  </section>
+  <div class="error" role="alert" th:if="${error}" th:text="'Действие отклонено: ' + ${error}"></div>
+  <nav class="steps" aria-label="Этапы"><span>01 Разрешить каталог</span><span>02 Сканировать</span><span>03 Проверить план</span><span>04 Выполнить / Undo</span></nav>
+  <section class="panel">
+    <h2>Разрешённый каталог</h2><p>Доступ только к выбранному существующему каталогу. Введите его реальный абсолютный путь.</p>
+    <form th:action="@{/ui/workspaces}" method="post" class="root-form">
+      <label for="rootPath">Путь к тестовой папке</label><input id="rootPath" name="rootPath" type="text" required maxlength="4095" placeholder="/private/tmp/FilePilotDemo…/Inbox или C:\…\Inbox" autocomplete="off">
+      <label class="check"><input type="checkbox" name="confirmed" value="true" required> Разрешаю FilePilot читать имена и метаданные в этом каталоге и выполнять отдельно подтверждённые переносы.</label>
+      <button>Разрешить каталог</button>
+    </form>
+    <ul class="workspaces"><li th:each="w : ${workspaces}"><a th:href="@{/(workspaceId=${w.id})}" th:text="${w.rootPath}"></a><form th:action="@{/ui/workspaces/{id}/revoke(id=${w.id})}" method="post"><button class="text-button">Отозвать доступ</button></form></li></ul>
+  </section>
+  <th:block th:if="${workspace != null}">
+    <section class="panel">
+      <div class="section-title"><div><h2>Инвентарь</h2><p class="path" th:text="${workspace.rootPath}"></p></div><form th:action="@{/ui/workspaces/{id}/scan(id=${workspace.id})}" method="post"><button>Сканировать</button></form></div>
+      <p class="hint">Глубина по умолчанию 4, максимум 2000 файлов. Скрытые записи и ссылки пропускаются. Содержимое документов не читается.</p>
+      <th:block th:if="${scan != null}">
+        <p><span class="badge" th:text="${scan.status}"></span> <strong th:text="${#lists.size(scan.files)}"></strong> файлов · <span th:text="${scan.warning}"></span></p>
+        <div class="toolbar"><form th:action="@{/ui/scans/{id}/duplicates(id=${scan.id})}" method="post"><button class="secondary">Проверить дубликаты (чтение SHA-256)</button></form><form th:action="@{/ui/scans/{id}/duplicates/cancel(id=${scan.id})}" method="post"><button class="text-button">Отменить расчёт</button></form></div>
+        <p th:if="${duplicates != null}" th:text="'Дубликаты: ' + ${duplicates.status} + ' · прочитано байт: ' + ${duplicates.hashedBytes}"></p>
+        <div class="table-wrap"><table><thead><tr><th>Относительный путь</th><th>Тип</th><th>Байт</th><th>Изменён</th><th>Категория</th><th>Дубликат</th></tr></thead><tbody><tr th:each="f : ${files}"><td th:text="${f.relativePath}"></td><td th:text="${f.extension}"></td><td th:text="${f.size}"></td><td th:text="${f.modifiedAt}"></td><td th:text="${f.category}"></td><td th:text="${duplicateLabels[f.id] ?: '—'}"></td></tr></tbody></table></div>
+        <div class="toolbar"><a th:if="${offset > 0}" th:href="@{/(workspaceId=${workspace.id},scanId=${scan.id},offset=${T(java.lang.Math).max(0,offset-100)})}">← Предыдущие 100</a><a th:if="${offset + 100 < #lists.size(scan.files)}" th:href="@{/(workspaceId=${workspace.id},scanId=${scan.id},offset=${offset+100})}">Следующие 100 →</a></div>
+        <form th:action="@{/ui/plans}" method="post" class="plan-form"><input type="hidden" name="scanId" th:value="${scan.id}"><label for="instruction">Что сделать с файлами?</label><input id="instruction" name="instruction" value="разложи по типам" required maxlength="500" list="commands"><datalist id="commands"><option value="разложи по типам"></option><option value="отдельно договоры"></option><option value="показать дубликаты"></option></datalist><p class="hint">Поддерживаются команды из списка. Договоры определяются только по имени. Команда о дубликатах создаёт план без переносов; для хеширования используйте кнопку выше.</p><label class="check"><input type="checkbox" name="useAI" value="true"> Уточнить категории через локальную LLM (до 20 файлов; при сбое — правила)</label><button>Построить план · без изменений файлов</button></form>
+      </th:block>
+    </section>
+    <section class="panel" th:if="${plan != null}">
+      <div class="section-title"><h2>План изменений</h2><span class="badge" th:text="${plan.status}"></span></div>
+      <p th:text="${plan.classificationStatus}"></p><p class="hint">План действует 15 минут. Confidence — оценка модели/правила, не гарантия. Перенос: до 64 МиБ на файл с проверкой SHA-256.</p>
+      <form th:action="@{/ui/plans/{id}/execute(id=${plan.id})}" method="post" data-execution-form>
+        <div class="table-wrap"><table><thead><tr><th>Выбор</th><th>Откуда → Куда</th><th>Основание</th><th>Статус</th></tr></thead><tbody><tr th:each="a : ${plan.actions}"><td><input type="checkbox" name="actionIds" th:value="${a.id}" th:checked="${a.selected}" th:disabled="${plan.status != 'DRAFT' or a.status != 'PROPOSED'}" th:aria-label="'Выбрать ' + ${a.sourceRelative}"></td><td><span th:text="${a.sourceRelative}"></span><br><strong th:text="'→ ' + ${a.destinationRelative}"></strong></td><td><span th:text="${a.reason}"></span><br><small th:text="${a.classifierSource} + ' · ' + ${a.confidence}"></small></td><td th:text="${a.status}"></td></tr></tbody></table></div>
+        <th:block th:if="${plan.status == 'DRAFT'}"><p class="notice">Файлы будут перемещены. Существующие файлы не перезаписываются. Переносы выполняются последовательно; возможен частичный результат.</p><label class="check"><input type="checkbox" name="confirmed" value="true" required> Я проверил(а) план и подтверждаю перенос выбранных файлов.</label><p data-selection-count></p><button data-execute>Подтвердить и выполнить</button></th:block>
+      </form>
+    </section>
+    <section class="panel"><h2>История и Undo</h2><p>Undo проверяет содержимое файла и свободное исходное имя. Конфликт означает отказ без перезаписи. Пустые каталоги остаются.</p><p th:if="${#lists.isEmpty(batches)}" class="hint">Здесь появятся подтверждённые сессии.</p><div class="batch" th:each="b : ${batches}"><div><strong th:text="${b.id}"></strong><br><small th:text="${b.createdAt} + ' · ' + ${b.status}"></small></div><form th:action="@{/ui/operations/{id}/undo(id=${b.id})}" method="post"><label class="check"><input type="checkbox" name="confirmed" value="true" required> Подтверждаю Undo</label><button class="secondary">Отменить переносы</button></form></div><div class="table-wrap"><table><thead><tr><th>Действие</th><th>Откуда → Куда</th><th>Результат</th></tr></thead><tbody><tr th:each="j : ${history}"><td th:text="${j.type}"></td><td><span th:text="${j.sourceRelative}"></span><br><span th:text="'→ ' + ${j.destinationRelative}"></span></td><td><strong th:text="${j.status}"></strong><br><small th:text="${j.errorCode}"></small></td></tr></tbody></table></div><small>Последние 200 записей. Полная история доступна через API с пагинацией.</small></section>
+  </th:block>
+  <footer>FilePilot · Apache-2.0 · Без облака, телеметрии и удаления файлов.<br>Перед работой остановите другие организаторы файлов. Данные приложения храните вне разрешённых каталогов.</footer>
+</main>
+</body>
+</html>

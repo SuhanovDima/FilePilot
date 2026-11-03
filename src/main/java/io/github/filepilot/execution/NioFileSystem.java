@@ -53,12 +53,15 @@ public class NioFileSystem implements FileSystemPort {
     }
     private BasicFileAttributes attributes(Path p) throws IOException { return Files.readAttributes(p,BasicFileAttributes.class,NOFOLLOW_LINKS); }
     public static String hash(Path path, long limit) throws IOException {
+        return hash(path,limit,() -> false);
+    }
+    public static String hash(Path path, long limit, java.util.function.BooleanSupplier cancelled) throws IOException {
         try {
             MessageDigest digest=MessageDigest.getInstance("SHA-256");
             try (SeekableByteChannel channel=Files.newByteChannel(path,Set.of(StandardOpenOption.READ,NOFOLLOW_LINKS))) {
                 ByteBuffer buffer=ByteBuffer.allocate(64*1024); long count=0;
                 while (channel.read(buffer) != -1) {
-                    if (Thread.currentThread().isInterrupted()) throw new PilotException("CANCELLED");
+                    if (Thread.currentThread().isInterrupted() || cancelled.getAsBoolean()) throw new PilotException("CANCELLED");
                     count+=buffer.position(); PilotException.require(count<=limit,"RESOURCE_LIMIT");
                     buffer.flip(); digest.update(buffer); buffer.clear();
                 }
