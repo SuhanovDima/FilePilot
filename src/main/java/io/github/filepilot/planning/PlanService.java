@@ -21,7 +21,12 @@ public class PlanService {
     private final OperationRepository repo;
     private final CommandInterpreter commands;
     private final Clock clock;
+    private ClassifierService classifiers;
     @org.springframework.beans.factory.annotation.Autowired
+    public PlanService(ScanService scans, WorkspaceService workspaces, WorkspacePolicy policy, OperationRepository repo, CommandInterpreter commands, ClassifierService classifiers) {
+        this(scans,workspaces,policy,repo,commands,Clock.systemUTC());
+        this.classifiers=classifiers;
+    }
     public PlanService(ScanService scans, WorkspaceService workspaces, WorkspacePolicy policy, OperationRepository repo, CommandInterpreter commands) {
         this(scans,workspaces,policy,repo,commands,Clock.systemUTC());
     }
@@ -31,19 +36,22 @@ public class PlanService {
     public synchronized Plan create(UUID scanId, String instruction, boolean useAI) throws IOException {
         var intent = commands.parse(instruction);
         var scan = scans.get(scanId); var w = workspaces.get(scan.workspaceId()); policy.root(w);
+        var enriched=classifiers==null ? new ClassifierService.Result(Map.of(),"RULES") : classifiers.enrich(scan.files(),instruction,useAI);
         List<PlanAction> actions = new ArrayList<>(); Set<String> destinations = new HashSet<>();
         for (FileEntry f : scan.files()) {
+            var suggestion=enriched.suggestions().get(f.id());
+            var category=suggestion==null ? f.category() : suggestion.category();
             String name = f.relativePath().substring(f.relativePath().lastIndexOf('/') + 1);
-            String dest = f.category().folder() + "/" + name;
+            String dest = category.folder() + "/" + name;
             var path = policy.resolve(w, dest); policy.resolve(w, f.relativePath());
             String key = dest.toLowerCase(Locale.ROOT);
             String status = intent == CommandInterpreter.Intent.DUPLICATES ? "SKIPPED" : f.relativePath().equals(dest) ? "SKIPPED_NO_CHANGE"
                 : Files.exists(path,NOFOLLOW_LINKS) || !destinations.add(key) ? "CONFLICT" : "PROPOSED";
-            actions.add(new PlanAction(UUID.randomUUID(),f.id(),f.relativePath(),dest,f.fingerprint(),f.category(),"RULE",
-                "Filename/extension rule; contents not read",0.8,status.equals("PROPOSED"),status));
+            actions.add(new PlanAction(UUID.randomUUID(),f.id(),f.relativePath(),dest,f.fingerprint(),category,suggestion==null ? "RULE" : "LLM",
+                suggestion==null ? "Filename/extension rule; contents not read" : suggestion.reason(),suggestion==null ? 0.8 : suggestion.confidence(),status.equals("PROPOSED"),status));
         }
         var now = clock.instant();
-        var plan = new Plan(UUID.randomUUID(),w.id(),scanId,now,now.plus(Duration.ofMinutes(15)),instruction,"DRAFT",actions,useAI ? "RULES_FALLBACK" : "RULES");
+        var plan = new Plan(UUID.randomUUID(),w.id(),scanId,now,now.plus(Duration.ofMinutes(15)),instruction,"DRAFT",actions,enriched.status());
         save(plan); return plan;
     }
     public Plan get(UUID id) { var p=repo.get("plans",id,Plan.class); workspaces.get(p.workspaceId()); return p; }
