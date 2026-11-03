@@ -17,7 +17,7 @@ public class WorkspaceService {
         var root = policy.authorizeRoot(input);
         for (Workspace existing : list()) if (existing.rootPath().equals(root.toString())) return existing;
         var w = new Workspace(UUID.randomUUID(), root.toString(), Instant.now(), true, policy.identity(root));
-        repo.put("workspaces", w.id(), w); return w;
+        repo.put("workspaces", w.id(), w); repo.audit("ROOT_ALLOWED",w.id()); return w;
     }
     public List<Workspace> list() { return repo.all("workspaces", Workspace.class).stream().filter(Workspace::enabled).toList(); }
     public Workspace get(UUID id) {
@@ -26,5 +26,6 @@ public class WorkspaceService {
     }
     public synchronized void revoke(UUID id) {
         var w = get(id); repo.put("workspaces", id, new Workspace(w.id(), w.rootPath(), w.createdAt(), false, w.identity()));
+        repo.audit("ROOT_REVOKED",id);
     }
 }

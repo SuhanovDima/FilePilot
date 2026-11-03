@@ -19,7 +19,7 @@ class ExecutionTest {
             Files.writeString(f.inbox.resolve("contract.pdf"),"contract fixture");
             Files.writeString(f.inbox.resolve("backup.zip"),"archive fixture");
             Plan p=plan(f);
-            assertThat(Files.list(f.inbox).toList()).hasSize(3);
+            try (var files=Files.list(f.inbox)) { assertThat(files.toList()).hasSize(3); }
             assertThat(Files.exists(f.inbox.resolve("Images"))).isFalse();
             assertThatThrownBy(() -> f.executions.execute(p.id(),false)).hasMessage("CONFIRMATION_REQUIRED");
             var chosen=Set.of(p.actions().get(0).id(),p.actions().get(1).id());

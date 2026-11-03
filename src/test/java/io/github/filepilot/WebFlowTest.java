@@ -40,6 +40,8 @@ class WebFlowTest {
         Files.writeString(inbox.resolve("photo.jpg"),"photo"); Files.writeString(inbox.resolve("contract.pdf"),"contract"); Files.writeString(inbox.resolve("archive.zip"),"archive");
         assertThat(send("POST","/api/v1/workspaces",Map.of("rootPath",inbox.toString(),"confirmed",true),null).statusCode()).isEqualTo(403);
         String token=json.readTree(get("/api/v1/csrf").body()).get("token").asText();
+        var invalid=send("POST","/api/v1/plans",Map.of("instruction","organize by type"),token);
+        assertThat(invalid.statusCode()).isEqualTo(400); assertThat(invalid.body()).contains("INVALID_REQUEST").doesNotContain(inbox.toString());
         var root=send("POST","/api/v1/workspaces",Map.of("rootPath",inbox.toString(),"confirmed",true),token);
         assertThat(root.statusCode()).isEqualTo(200); String w=json.readTree(root.body()).get("id").asText();
         var scan=send("POST","/api/v1/workspaces/"+w+"/scans",Map.of(),token);
@@ -62,5 +64,10 @@ class WebFlowTest {
         assertThat(Files.readString(inbox.resolve("archive.zip"))).isEqualTo("archive");
         var foreign=HttpRequest.newBuilder(URI.create(base+"/api/v1/workspaces")).header("Origin","http://evil.example").GET().build();
         assertThat(client.send(foreign,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(403);
+        try (var socket=new Socket("127.0.0.1",URI.create(base).getPort())) {
+            socket.getOutputStream().write("GET /api/v1/health HTTP/1.1\r\nHost: evil.example\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            assertThat(new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(),StandardCharsets.US_ASCII)).readLine()).contains("403");
+        }
+        assertThat(app.getEnvironment().getProperty("server.address")).isEqualTo("127.0.0.1");
     }
 }

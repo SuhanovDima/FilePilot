@@ -47,7 +47,7 @@ public class PlanService {
             String key = dest.toLowerCase(Locale.ROOT);
             String status = intent == CommandInterpreter.Intent.DUPLICATES ? "SKIPPED" : f.relativePath().equals(dest) ? "SKIPPED_NO_CHANGE"
                 : Files.exists(path,NOFOLLOW_LINKS) || !destinations.add(key) ? "CONFLICT" : "PROPOSED";
-            actions.add(new PlanAction(UUID.randomUUID(),f.id(),f.relativePath(),dest,f.fingerprint(),category,suggestion==null ? "RULE" : "LLM",
+            actions.add(new PlanAction(UUID.randomUUID(),f.id(),f.relativePath(),dest,f.size(),f.fingerprint(),category,suggestion==null ? "RULE" : "LLM",
                 suggestion==null ? "Filename/extension rule; contents not read" : suggestion.reason(),suggestion==null ? 0.8 : suggestion.confidence(),status.equals("PROPOSED"),status));
         }
         var now = clock.instant();

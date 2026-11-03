@@ -18,6 +18,12 @@ public class SqliteRepository implements OperationRepository, AutoCloseable {
 
     public SqliteRepository(PilotSettings settings) throws Exception {
         Files.createDirectories(settings.dataDir);
+        for (String name : List.of("instance.lock","filepilot.db","filepilot.db-wal","filepilot.db-shm","filepilot.db-journal")) {
+            Path path=settings.dataDir.resolve(name);
+            PilotException.require(!Files.isSymbolicLink(path),"UNSAFE_DATA_DIR");
+            if (Files.exists(path,LinkOption.NOFOLLOW_LINKS))
+                PilotException.require(Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS),"UNSAFE_DATA_DIR");
+        }
         lockChannel = FileChannel.open(settings.dataDir.resolve("instance.lock"), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
         lock = lockChannel.tryLock();
         if (lock == null) { lockChannel.close(); throw new PilotException("INSTANCE_ALREADY_RUNNING"); }

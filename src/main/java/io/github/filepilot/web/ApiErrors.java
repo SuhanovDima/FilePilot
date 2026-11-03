@@ -12,7 +12,9 @@ public class ApiErrors {
         ProblemDetail p = ProblemDetail.forStatusAndDetail(status, e.code()); p.setTitle("FilePilot refused the operation"); p.setProperty("code", e.code());
         return ResponseEntity.status(status).body(p);
     }
-    @ExceptionHandler({IOException.class, IllegalArgumentException.class}) ResponseEntity<ProblemDetail> io(Exception e) {
+    @ExceptionHandler({IOException.class, IllegalArgumentException.class, org.springframework.web.bind.MethodArgumentNotValidException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class,org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+        org.springframework.web.bind.MissingServletRequestParameterException.class}) ResponseEntity<ProblemDetail> io(Exception e) {
         ProblemDetail p = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid input or unavailable filesystem entry"); p.setProperty("code", "INVALID_REQUEST");
         return ResponseEntity.badRequest().body(p);
     }

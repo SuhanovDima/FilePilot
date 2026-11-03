@@ -16,3 +16,9 @@ The optional adapter is constructed programmatically after loopback URI validati
 Boot 4 / Spring Test 7's Jupiter extension calls JUnit 6-only methods. To keep the requested JUnit 5.13.4,
 tests use its engine without `SpringExtension`, starting the real Boot context programmatically.
 Moderation auto-configuration must also be disabled (`spring.ai.model.moderation=none`) for key-free startup.
+The final application additionally excludes all six OpenAI model auto-configurations in code: external Spring AI
+environment properties cannot accidentally construct an alternate provider. The loopback adapter remains explicit.
+
+Spring AI 2.0.2 uses the OpenAI Java SDK client. Its exact builder methods and HTTP interface were checked against
+the published 2.0.2 sources JAR before implementing the adapter. The supplied transport disables redirects/proxies
+and caps response bytes. HTMX 2.0.8 and its Zero-Clause BSD license were vendored from its official GitHub tag.

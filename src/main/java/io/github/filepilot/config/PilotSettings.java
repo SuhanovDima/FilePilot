@@ -1,6 +1,6 @@
 package io.github.filepilot.config;
 
-import java.nio.file.Path;
+import java.nio.file.*;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,12 @@ public class PilotSettings {
         Path defaultDir = base != null ? Path.of(base, "FilePilot") : os.contains("mac")
             ? Path.of(System.getProperty("user.home"), "Library", "Application Support", "FilePilot")
             : Path.of(System.getProperty("user.home"), ".local", "share", "filepilot");
-        dataDir = Path.of(env.getProperty("filepilot.data-dir", defaultDir.toString())).toAbsolutePath().normalize();
+        Path requested=Path.of(env.getProperty("filepilot.data-dir", defaultDir.toString())).toAbsolutePath().normalize();
+        try {
+            Path ancestor=requested;
+            while (!Files.exists(ancestor,LinkOption.NOFOLLOW_LINKS)) ancestor=ancestor.getParent();
+            dataDir=ancestor.toRealPath().resolve(ancestor.relativize(requested)).normalize();
+        } catch (java.io.IOException e) { throw new PilotException("INVALID_DATA_DIR"); }
         maxFiles = Integer.parseInt(env.getProperty("filepilot.scan.max-files", "2000"));
         maxDepth = Integer.parseInt(env.getProperty("filepilot.scan.max-depth", "4"));
         PilotException.require(maxFiles > 0 && maxFiles <= 10000 && maxDepth >= 1 && maxDepth <= 16, "INVALID_CONFIG");

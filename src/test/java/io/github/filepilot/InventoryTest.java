@@ -61,4 +61,14 @@ class InventoryTest {
             assertThatThrownBy(() -> f.scans.scan(w.id())).hasMessage("UNAUTHORIZED_ROOT");
         }
     }
+    @Test void dataDirectoryCanonicalizationPreventsOverlapThroughAliases() throws Exception {
+        Path actual=Files.createDirectory(temp.resolve("data"));
+        Path alias=temp.resolve("data-alias");
+        try { Files.createSymbolicLink(alias,actual); }
+        catch (UnsupportedOperationException | java.nio.file.FileSystemException e) { Assumptions.abort("Symlink privileges unavailable"); }
+        var settings=new io.github.filepilot.config.PilotSettings(new org.springframework.mock.env.MockEnvironment().withProperty("filepilot.data-dir",alias.toString()));
+        assertThat(settings.dataDir).isEqualTo(actual.toRealPath());
+        var policy=new io.github.filepilot.workspace.WorkspacePolicy(settings);
+        assertThatThrownBy(() -> policy.authorizeRoot(temp.toRealPath().toString())).hasMessage("APP_DATA_OVERLAP");
+    }
 }

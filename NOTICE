@@ -1,0 +1,8 @@
+FilePilot 0.1.0
+Copyright 2026 FilePilot contributors
+
+Project code is licensed under Apache-2.0.
+Vendored HTMX 2.0.8 is copyright Big Sky Software and distributed under the
+Zero-Clause BSD license; see src/main/resources/static/vendor/HTMX-LICENSE.
+Dependencies and optional local models retain their respective licenses.
+No model weights or user documents are distributed.

@@ -10,3 +10,5 @@ specification's suggested column layout. Journal entries are independent durable
 Application data belongs outside all permitted workspaces. No file contents, real API keys or full model responses are persisted.
 Paths and filenames are sensitive metadata: protect the data directory with your OS account's access controls.
 No automatic retention/deletion is implemented; database growth is a known MVP limitation.
+The configured data directory is canonicalized before overlap checks, and symbolic links in SQLite/lock files
+are refused. Audit entries store consent kind and resource UUID, without paths or file contents.

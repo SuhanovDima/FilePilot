@@ -29,7 +29,10 @@ public class ExecutionService {
             if (!p.status().equals("DRAFT")) { PilotException.require(!p.status().equals("EXPIRED"),"EXPIRED_PLAN"); return p; }
             plans.validateDraft(p);
             PilotException.require(p.actions().stream().anyMatch(PlanAction::selected),"EMPTY_SELECTION");
+            var selected=p.actions().stream().filter(PlanAction::selected).toList();
+            PilotException.require(selected.size()<=200 && selected.stream().mapToLong(PlanAction::expectedSize).sum()<=256L*1024*1024,"BATCH_RESOURCE_LIMIT");
             plans.save(p.status("EXECUTING"));
+            repo.audit("EXECUTION_CONFIRMED",planId);
             List<PlanAction> result=new ArrayList<>();
             boolean failed=false;
             for (PlanAction a : p.actions()) {
@@ -76,6 +79,7 @@ public class ExecutionService {
         synchronized (plans) {
             reconcile(); var p=plans.get(batchId);
             PilotException.require(Set.of("COMPLETED","PARTIAL_FAILED").contains(p.status()),"INVALID_BATCH");
+            repo.audit("UNDO_CONFIRMED",batchId);
             var all=history(p.workspaceId());
             var moves=all.stream().filter(j -> j.batchId().equals(batchId) && j.type().equals("MOVE") && j.status().equals("DONE")).toList().reversed();
             for (var j : moves) {

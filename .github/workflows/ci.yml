@@ -16,5 +16,15 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: ./mvnw --batch-mode verify
+      - if: runner.os != 'Windows'
+        run: ./mvnw --batch-mode verify
         shell: bash
+      - if: runner.os == 'Windows'
+        run: .\mvnw.cmd --batch-mode verify
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filepilot-${{ runner.os }}
+          path: |
+            target/filepilot-0.1.0.jar
+            target/surefire-reports/*.xml

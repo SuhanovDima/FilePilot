@@ -59,6 +59,7 @@ public class ScanService {
         files.sort(Comparator.comparing(FileEntry::relativePath));
         var scan = new ScanRun(UUID.randomUUID(), workspaceId, Instant.now(), partial[0] ? "PARTIAL_SCAN" : "COMPLETE", files, partial[0] ? "Limits, unsafe paths or unreadable entries omitted" : "Metadata only; symbolic links and hidden entries ignored");
         repo.put("scan_runs", scan.id(), scan);
+        repo.audit("SCAN_COMPLETED",scan.id());
         return scan;
     }
     public ScanRun get(UUID id) { var s = repo.get("scan_runs", id, ScanRun.class); workspaces.get(s.workspaceId()); return s; }

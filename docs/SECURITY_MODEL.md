@@ -19,7 +19,8 @@ cannot open the same database (instance lock). Do not run separate data director
 
 Immediately before each move: reauthorize paths, require an unchanged regular source, an absent destination,
 read/write permission checks, matching file stores, metadata and bounded SHA-256. Only files <=64 MiB can be moved
-in this MVP so that strict integrity checking is bounded. Files never receive REPLACE_EXISTING. Java's ATOMIC_MOVE
+in this MVP so that strict integrity checking is bounded. Each confirmation is limited to 200 actions / 256 MiB.
+Files never receive REPLACE_EXISTING. Java's ATOMIC_MOVE
 allows provider-specific replacement, so FilePilot intentionally uses ordinary no-replace Files.move within one
 file store instead of the specification's initial ATOMIC_MOVE preference. No cross-volume copy/delete fallback.
 There remains a TOCTOU window against hostile concurrent actors; Java NIO cannot guarantee this contract against
